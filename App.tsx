@@ -1,45 +1,42 @@
 /**
- * Sample React Native App
- * https://github.com/facebook/react-native
+ * ClavvUp App
+ * Small steps, real change.
  *
  * @format
  */
 
-import { NewAppScreen } from '@react-native/new-app-screen';
-import { StatusBar, StyleSheet, useColorScheme, View } from 'react-native';
-import {
-  SafeAreaProvider,
-  useSafeAreaInsets,
-} from 'react-native-safe-area-context';
+import React, { useState } from 'react';
+import { StatusBar } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import LoaderScreen from './clavvup/clavvupScreens/LoaderScreen';
+import OnboardingScreen from './clavvup/clavvupScreens/OnboardingScreen';
+import AppNavigator from './clavvup/clavvupNavigation/AppNavigator';
 
 function App() {
-  const isDarkMode = useColorScheme() === 'dark';
+  const [showLoader, setShowLoader] = useState(true);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+
+  const handleLoaderComplete = () => {
+    setShowLoader(false);
+    setShowOnboarding(true); // Онбординг завжди показується після лоадера
+  };
+
+  const handleOnboardingComplete = () => {
+    setShowOnboarding(false);
+  };
 
   return (
     <SafeAreaProvider>
-      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
-      <AppContent />
+      <StatusBar barStyle="light-content" />
+      {showLoader ? (
+        <LoaderScreen onComplete={handleLoaderComplete} />
+      ) : showOnboarding ? (
+        <OnboardingScreen onComplete={handleOnboardingComplete} />
+      ) : (
+        <AppNavigator />
+      )}
     </SafeAreaProvider>
   );
 }
-
-function AppContent() {
-  const safeAreaInsets = useSafeAreaInsets();
-
-  return (
-    <View style={styles.container}>
-      <NewAppScreen
-        templateFileName="App.tsx"
-        safeAreaInsets={safeAreaInsets}
-      />
-    </View>
-  );
-}
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-});
 
 export default App;
