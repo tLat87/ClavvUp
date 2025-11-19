@@ -14,6 +14,7 @@ import { getTaskTypeColor, taskTemplates } from '../clavvupData/tasks';
 import { wasClawUsedToday, setClawUsedToday, getDailyProgress, saveDailyProgress } from '../clavvupUtils/storage';
 import { Task, TaskType } from '../clavvupTypes';
 import { BACKGROUND_IMAGE } from '../clavvupConstants/Images';
+import TwinklingStars from '../clavvupComponents/TwinklingStars';
 
 const { width, height } = Dimensions.get('window');
 
@@ -28,10 +29,68 @@ export default function ClawScreen() {
   const clawY = useRef(new Animated.Value(-100)).current;
   const clawOpacity = useRef(new Animated.Value(0)).current;
   const ballY = useRef(new Animated.Value(0)).current;
+  const buttonPulse = useRef(new Animated.Value(0)).current;
+  const auraPulse = useRef(new Animated.Value(0)).current;
+  const ballGlow = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     checkClawStatus();
   }, []);
+
+  useEffect(() => {
+    const buttonLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(buttonPulse, {
+          toValue: 1,
+          duration: 1500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(buttonPulse, {
+          toValue: 0,
+          duration: 1500,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    const auraLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(auraPulse, {
+          toValue: 1,
+          duration: 2000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(auraPulse, {
+          toValue: 0,
+          duration: 2000,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    const ballLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(ballGlow, {
+          toValue: 1,
+          duration: 1800,
+          useNativeDriver: true,
+        }),
+        Animated.timing(ballGlow, {
+          toValue: 0,
+          duration: 1800,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+
+    buttonLoop.start();
+    auraLoop.start();
+    ballLoop.start();
+
+    return () => {
+      buttonLoop.stop();
+      auraLoop.stop();
+      ballLoop.stop();
+    };
+  }, [auraPulse, ballGlow, buttonPulse]);
 
   const checkClawStatus = async () => {
     const used = await wasClawUsedToday();
@@ -111,6 +170,7 @@ export default function ClawScreen() {
   return (
     <View style={styles.container}>
       <ImageBackground source={BACKGROUND_IMAGE} style={styles.backgroundImage} resizeMode="cover">
+        <TwinklingStars count={24} />
         <Image source={require('../clavvupAssets/img/balls.png')} style={{position: 'absolute',right: 0, bottom: -50, width: 500, height: 300}} resizeMode="contain" />
         <View style={styles.content}>
         {/* Header */}
@@ -118,6 +178,26 @@ export default function ClawScreen() {
 
         {/* Claw Animation */}
         <View style={styles.clawContainer}>
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.clawAura,
+              {
+                opacity: auraPulse.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0.2, 0.6],
+                }),
+                transform: [
+                  {
+                    scale: auraPulse.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0.95, 1.1],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          />
           <Animated.View
             style={[
               styles.claw,
@@ -149,26 +229,57 @@ export default function ClawScreen() {
         {/* Balls Container */}
         <View style={styles.ballsContainer}>
           {BALL_COLORS.map((type, index) => (
-            <View
+            <Animated.View
               key={type}
               style={[
                 styles.ballPlaceholder,
                 { backgroundColor: getTaskTypeColor(type) },
+                {
+                  transform: [
+                    {
+                      scale: ballGlow.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [1, 1.05],
+                      }),
+                    },
+                  ],
+                  opacity: ballGlow.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.85, 1],
+                  }),
+                },
               ]}
             />
           ))}
         </View>
 
         {/* Surprise Me Button */}
-        <TouchableOpacity
-          style={[styles.button, clawUsed && styles.buttonDisabled]}
-          onPress={handleSurpriseMe}
-          disabled={clawUsed}
+        <Animated.View
+          style={[
+            styles.buttonWrapper,
+            {
+              transform: [
+                {
+                  scale: buttonPulse.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [1, 1.08],
+                  }),
+                },
+              ],
+            },
+          ]}
         >
-          <Text style={styles.buttonText}>
-            {clawUsed ? 'Already Used Today' : 'Surprise Me'}
-          </Text>
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.button, clawUsed && styles.buttonDisabled]}
+            onPress={handleSurpriseMe}
+            disabled={clawUsed}
+            activeOpacity={0.9}
+          >
+            <Text style={styles.buttonText}>
+              {clawUsed ? 'Already Used Today' : 'Surprise Me'}
+            </Text>
+          </TouchableOpacity>
+        </Animated.View>
 
         {clawUsed && (
           <Text style={styles.hintText}>
@@ -243,6 +354,13 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
     paddingTop: 40,
   },
+  clawAura: {
+    position: 'absolute',
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    backgroundColor: 'rgba(65, 105, 225, 0.25)',
+  },
   claw: {
     width: 60,
     height: 80,
@@ -313,12 +431,14 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingHorizontal: 32,
     alignItems: 'center',
-    marginTop: 20,
+  },
+  buttonWrapper: {
     position: 'absolute',
     top: 20,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
     zIndex: 1000,
-    // right: 20,
-    alignSelf: 'center',
   },
   buttonDisabled: {
     backgroundColor: '#444',

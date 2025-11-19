@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -15,6 +15,9 @@ import { getDailyProgress, saveDailyProgress } from '../clavvupUtils/storage';
 import { Task, DailyProgress } from '../clavvupTypes';
 import { Share } from 'react-native';
 import { BACKGROUND_IMAGE, CHARACTER_IMAGE } from '../clavvupConstants/Images';
+import TwinklingStars from '../clavvupComponents/TwinklingStars';
+
+const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
 
 const { width, height } = Dimensions.get('window');
 
@@ -26,10 +29,62 @@ export default function TodaysQuestScreen() {
   const [completedCount, setCompletedCount] = useState(0);
   const [showQuote, setShowQuote] = useState(false);
   const [fireworksAnim] = useState(new Animated.Value(0));
+  const characterFloat = useRef(new Animated.Value(0)).current;
+  const quotePulse = useRef(new Animated.Value(0)).current;
+  const progressAnim = useRef(new Animated.Value(0)).current;
+  const taskScales = useRef<Record<string, Animated.Value>>({}).current;
 
   useEffect(() => {
     loadDailyProgress();
   }, []);
+
+  useEffect(() => {
+    const floatLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(characterFloat, {
+          toValue: 1,
+          duration: 2500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(characterFloat, {
+          toValue: 0,
+          duration: 2500,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    floatLoop.start();
+
+    const pulseLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(quotePulse, {
+          toValue: 1,
+          duration: 1600,
+          useNativeDriver: true,
+        }),
+        Animated.timing(quotePulse, {
+          toValue: 0,
+          duration: 1600,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    pulseLoop.start();
+
+    return () => {
+      floatLoop.stop();
+      pulseLoop.stop();
+    };
+  }, [characterFloat, quotePulse]);
+
+  useEffect(() => {
+    Animated.spring(progressAnim, {
+      toValue: completedCount / 3,
+      useNativeDriver: false,
+      speed: 2,
+      bounciness: 6,
+    }).start();
+  }, [completedCount, progressAnim]);
 
   const loadDailyProgress = async () => {
     const progress = await getDailyProgress();
@@ -54,6 +109,13 @@ export default function TodaysQuestScreen() {
   };
 
   const toggleTask = async (taskId: string) => {
+    const getTaskScale = (id: string) => {
+      if (!taskScales[id]) {
+        taskScales[id] = new Animated.Value(1);
+      }
+      return taskScales[id];
+    };
+
     const updatedTasks = tasks.map(task =>
       task.id === taskId ? { ...task, completed: !task.completed } : task
     );
@@ -79,6 +141,18 @@ export default function TodaysQuestScreen() {
       ]).start();
     }
 
+    const scale = getTaskScale(taskId);
+    Animated.sequence([
+      Animated.spring(scale, {
+        toValue: 1.05,
+        useNativeDriver: true,
+      }),
+      Animated.spring(scale, {
+        toValue: 1,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
     const progress = await getDailyProgress();
     if (progress) {
       await saveDailyProgress({
@@ -103,33 +177,68 @@ export default function TodaysQuestScreen() {
   return (
     <View style={styles.container}>
       <ImageBackground source={BACKGROUND_IMAGE} style={styles.backgroundImage} resizeMode="cover">
+        <TwinklingStars count={28} />
         <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
           {/* Character Image */}
           <View style={styles.characterContainer}>
-            <Image
+            <Animated.Image
               source={CHARACTER_IMAGE}
-              style={styles.characterImage}
+              style={[
+                styles.characterImage,
+                {
+                  transform: [
+                    {
+                      translateY: characterFloat.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [-8, 8],
+                      }),
+                    },
+                  ],
+                },
+              ]}
               resizeMode="contain"
             />
           </View>
 
           {/* Motivational Banner - Always Visible */}
-          <View style={styles.quoteBanner}>
+          <Animated.View
+            style={[
+              styles.quoteBanner,
+              {
+                transform: [
+                  {
+                    scale: quotePulse.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [1, 1.03],
+                    }),
+                  },
+                ],
+                shadowOpacity: quotePulse.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0.6, 1],
+                }),
+              },
+            ]}
+          >
             <Text style={styles.quoteText}>Small steps, real change.</Text>
             <TouchableOpacity onPress={handleShareQuote} style={styles.shareButton}>
             </TouchableOpacity>
-          </View>
+          </Animated.View>
 
           {/* Daily Tasks */}
           <Text style={styles.sectionTitle}>Daily Tasks:</Text>
           {tasks.map((task, index) => {
             const taskColor = TASK_COLORS[index] || '#FF69B4';
+            if (!taskScales[task.id]) {
+              taskScales[task.id] = new Animated.Value(1);
+            }
             return (
-              <TouchableOpacity
+              <AnimatedTouchableOpacity
                 key={task.id}
                 style={[
                   styles.taskCard,
                   { backgroundColor: taskColor },
+                  { transform: [{ scale: taskScales[task.id] }] },
                 ]}
                 onPress={() => toggleTask(task.id)}
               >
@@ -137,13 +246,24 @@ export default function TodaysQuestScreen() {
             <View style={styles.checkbox}>
               {task.completed && <View style={styles.checkmarkFill} />}
             </View>
-              </TouchableOpacity>
+              </AnimatedTouchableOpacity>
             );
           })}
 
           {/* Daily Progress */}
           <Text style={styles.sectionTitle}>Daily Progress:</Text>
           <View style={styles.progressCard}>
+            <Animated.View
+              style={[
+                styles.progressFill,
+                {
+                  width: progressAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: ['0%', '100%'],
+                  }),
+                },
+              ]}
+            />
             <Text style={styles.progressText}>{completedCount}/3</Text>
           </View>
 
@@ -165,6 +285,8 @@ export default function TodaysQuestScreen() {
                 },
               ]}
             >
+              <View style={styles.fireworkRing} />
+              <View style={styles.fireworkCore} />
             </Animated.View>
           )}
         </ScrollView>
@@ -277,6 +399,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: 60,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
   },
   progressText: {
     fontSize: 24,
@@ -288,5 +415,20 @@ const styles = StyleSheet.create({
     top: '50%',
     left: '50%',
     transform: [{ translateX: -50 }, { translateY: -50 }],
+  },
+  fireworkRing: {
+    width: 180,
+    height: 180,
+    borderRadius: 90,
+    borderWidth: 2,
+    borderColor: '#FFD700',
+    opacity: 0.6,
+  },
+  fireworkCore: {
+    position: 'absolute',
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: 'rgba(255, 215, 0, 0.3)',
   },
 });

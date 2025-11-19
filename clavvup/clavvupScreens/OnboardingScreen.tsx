@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -7,8 +7,10 @@ import {
   Dimensions,
   Image,
   ImageBackground,
+  Animated,
 } from 'react-native';
 import { BACKGROUND_IMAGE } from '../clavvupConstants/Images';
+import TwinklingStars from '../clavvupComponents/TwinklingStars';
 
 const { width, height } = Dimensions.get('window');
 
@@ -41,6 +43,9 @@ const onboardingData = [
 
 export default function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
+  const cardAnim = useRef(new Animated.Value(1)).current;
+  const heroFloat = useRef(new Animated.Value(0)).current;
+  const buttonPulse = useRef(new Animated.Value(0)).current;
 
   const handleNext = () => {
     if (currentIndex < onboardingData.length - 1) {
@@ -52,23 +57,145 @@ export default function OnboardingScreen({ onComplete }: OnboardingScreenProps) 
 
   const currentData = onboardingData[currentIndex];
 
+  useEffect(() => {
+    cardAnim.setValue(0);
+    Animated.parallel([
+      Animated.timing(cardAnim, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [cardAnim, currentIndex]);
+
+  useEffect(() => {
+    const floatLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(heroFloat, {
+          toValue: 1,
+          duration: 2500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(heroFloat, {
+          toValue: 0,
+          duration: 2500,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    floatLoop.start();
+
+    const pulseLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(buttonPulse, {
+          toValue: 1,
+          duration: 1200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(buttonPulse, {
+          toValue: 0,
+          duration: 1200,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    pulseLoop.start();
+
+    return () => {
+      floatLoop.stop();
+      pulseLoop.stop();
+    };
+  }, [buttonPulse, heroFloat]);
+
   return (
     <View style={styles.container}>
       <ImageBackground source={BACKGROUND_IMAGE} style={styles.backgroundImage} resizeMode="cover">
-        {/* Stars */}
-       
+        <TwinklingStars count={36} />
 
         {/* Content */}
-        <Image source={require('../clavvupAssets/img/teta.png')} style={{width: 300, height: 300, position: 'absolute',  alignSelf: 'center', marginTop: 100}} resizeMode="contain" /> 
+        <Animated.Image
+          source={require('../clavvupAssets/img/teta.png')}
+          style={[
+            styles.heroImage,
+            {
+              transform: [
+                {
+                  translateY: heroFloat.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [-10, 8],
+                  }),
+                },
+              ],
+            },
+          ]}
+          resizeMode="contain"
+        />
         <View style={styles.content}>
-          <View style={styles.textBox}>
+          <Animated.View
+            style={[
+              styles.textBox,
+              {
+                opacity: cardAnim,
+                transform: [
+                  {
+                    translateY: cardAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [30, 0],
+                    }),
+                  },
+                  {
+                    scale: cardAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0.95, 1],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          >
             <Text style={styles.title}>{currentData.title}</Text>
             <Text style={styles.description}>{currentData.description}</Text>
-          </View>
+          </Animated.View>
 
-          <TouchableOpacity style={styles.button} onPress={handleNext}>
-            <Text style={styles.buttonText}>{currentData.buttonText}</Text>
-          </TouchableOpacity>
+          <Animated.View style={[styles.dotsContainer, { opacity: cardAnim }]}>
+            {onboardingData.map((_, index) => {
+              const active = index === currentIndex;
+              const activeScale = cardAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0.8, 1.2],
+              });
+              return (
+                <Animated.View
+                  key={`dot-${index}`}
+                  style={[
+                    styles.progressDot,
+                    active && styles.progressDotActive,
+                    active ? { transform: [{ scale: activeScale }] } : undefined,
+                  ]}
+                />
+              );
+            })}
+          </Animated.View>
+
+          <Animated.View
+            style={[
+              styles.buttonWrapper,
+              {
+                transform: [
+                  {
+                    scale: buttonPulse.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [1, 1.05],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          >
+            <TouchableOpacity style={styles.button} onPress={handleNext} activeOpacity={0.85}>
+              <Text style={styles.buttonText}>{currentData.buttonText}</Text>
+            </TouchableOpacity>
+          </Animated.View>
         </View>
       </ImageBackground>
     </View>
@@ -79,6 +206,13 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#1a0a2e',
+  },
+  heroImage: {
+    width: 300,
+    height: 300,
+    position: 'absolute',
+    alignSelf: 'center',
+    marginTop: 100,
   },
   backgroundImage: {
     flex: 1,
@@ -130,6 +264,24 @@ const styles = StyleSheet.create({
     color: '#fff',
     lineHeight: 24,
     textAlign: 'center',
+  },
+  dotsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginBottom: 24,
+  },
+  progressDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.4)',
+    marginHorizontal: 6,
+  },
+  progressDotActive: {
+    backgroundColor: '#FFD700',
+  },
+  buttonWrapper: {
+    alignSelf: 'center',
   },
   button: {
     backgroundColor: '#6B46C1',

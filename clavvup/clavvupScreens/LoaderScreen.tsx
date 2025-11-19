@@ -5,10 +5,10 @@ import {
   StyleSheet,
   Dimensions,
   Animated,
-  Image,
   ImageBackground,
 } from 'react-native';
 import { BACKGROUND_IMAGE } from '../clavvupConstants/Images';
+import TwinklingStars from '../clavvupComponents/TwinklingStars';
 
 const { width, height } = Dimensions.get('window');
 
@@ -20,6 +20,8 @@ export default function LoaderScreen({ onComplete }: LoaderScreenProps) {
   const progressAnim = useRef(new Animated.Value(0)).current;
   const logoScale = useRef(new Animated.Value(0.8)).current;
   const logoOpacity = useRef(new Animated.Value(0)).current;
+  const shimmerAnim = useRef(new Animated.Value(0)).current;
+  const floatAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     // Logo animation
@@ -36,6 +38,32 @@ export default function LoaderScreen({ onComplete }: LoaderScreenProps) {
       }),
     ]).start();
 
+    // Floating effect for cards
+    const floatLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(floatAnim, {
+          toValue: 1,
+          duration: 2500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(floatAnim, {
+          toValue: 0,
+          duration: 2500,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    floatLoop.start();
+
+    const shimmerLoop = Animated.loop(
+      Animated.timing(shimmerAnim, {
+        toValue: 1,
+        duration: 1200,
+        useNativeDriver: true,
+      })
+    );
+    shimmerLoop.start();
+
     // Progress bar animation (2 seconds)
     Animated.timing(progressAnim, {
       toValue: 1,
@@ -44,7 +72,11 @@ export default function LoaderScreen({ onComplete }: LoaderScreenProps) {
     }).start(() => {
       onComplete();
     });
-  }, []);
+    return () => {
+      floatLoop.stop();
+      shimmerLoop.stop();
+    };
+  }, [floatAnim, shimmerAnim]);
 
   const progressWidth = progressAnim.interpolate({
     inputRange: [0, 1],
@@ -54,22 +86,48 @@ export default function LoaderScreen({ onComplete }: LoaderScreenProps) {
   return (
     <View style={styles.container}>
       <ImageBackground source={BACKGROUND_IMAGE} style={styles.backgroundImage} resizeMode="cover">
-        <View style={styles.content}>
-          {/* Central Logo */}
+        <TwinklingStars count={32} />
+        <Animated.View
+          style={[
+            styles.content,
+            {
+              opacity: logoOpacity,
+              transform: [
+                {
+                  translateY: floatAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [6, -4],
+                  }),
+                },
+              ],
+            },
+          ]}
+        >
           <Animated.View
             style={[
               styles.logoContainer,
               {
                 transform: [{ scale: logoScale }],
-                opacity: logoOpacity,
               },
             ]}
           >
-            
-
-            <Image source={require('../clavvupAssets/img/8906ebdc9141aa522b2d7a8d1aaf86e204bcaeb0.png')} style={{width: 300, height: 300}} resizeMode="contain" /> 
+            <View style={styles.clawUpContainer}>
+              <Text style={styles.clawText}>CLAVV</Text>
+              <Text style={styles.upText}>UP</Text>
+            </View>
+            <View style={styles.bannerContainer}>
+              <View style={styles.bannerBorder}>
+                {Array.from({ length: 6 }).map((_, index) => (
+                  <View
+                    key={`bulb-${index}`}
+                    style={index % 2 === 0 ? styles.lightBulb : styles.lightBulbSmall}
+                  />
+                ))}
+              </View>
+              <Text style={styles.bannerText}>SMALL STEPS · REAL CHANGE</Text>
+            </View>
           </Animated.View>
-        </View>
+        </Animated.View>
 
         {/* Bottom Progress Bar */}
         <View style={styles.progressContainer}>
@@ -78,6 +136,21 @@ export default function LoaderScreen({ onComplete }: LoaderScreenProps) {
               style={[
                 styles.progressBarFill,
                 { width: progressWidth },
+              ]}
+            />
+            <Animated.View
+              style={[
+                styles.progressHighlight,
+                {
+                  transform: [
+                    {
+                      translateX: shimmerAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [-20, width * 0.85],
+                      }),
+                    },
+                  ],
+                },
               ]}
             />
           </View>
@@ -218,6 +291,13 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#fff',
     letterSpacing: 2,
+  },
+  progressHighlight: {
+    position: 'absolute',
+    width: 60,
+    height: '100%',
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    borderRadius: 25,
   },
   lightBulb: {
     width: 6,

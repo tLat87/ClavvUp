@@ -13,6 +13,7 @@ import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Share } from 'react-native';
 import { BACKGROUND_IMAGE } from '../clavvupConstants/Images';
+import TwinklingStars from '../clavvupComponents/TwinklingStars';
 import { stories } from '../clavvupData/stories';
 import { Story } from '../clavvupTypes';
 
@@ -83,6 +84,7 @@ export default function StoryDetailScreen() {
   return (
     <View style={styles.container}>
       <ImageBackground source={BACKGROUND_IMAGE} style={styles.backgroundImage} resizeMode="cover">
+        <TwinklingStars count={30} />
         {/* Close Button */}
         <TouchableOpacity
           style={styles.closeButton}

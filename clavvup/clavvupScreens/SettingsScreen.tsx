@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,11 +7,13 @@ import {
   Dimensions,
   ImageBackground,
   Switch,
+  Animated,
 } from 'react-native';
 import { getSettings, saveSettings } from '../clavvupUtils/storage';
 import { AppSettings } from '../clavvupTypes';
 import { Share } from 'react-native';
 import { BACKGROUND_IMAGE } from '../clavvupConstants/Images';
+import TwinklingStars from '../clavvupComponents/TwinklingStars';
 
 const { width } = Dimensions.get('window');
 
@@ -21,10 +23,25 @@ export default function SettingsScreen() {
     notificationsEnabled: true,
     notificationTime: '09:00',
   });
+  const shimmerAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     loadSettings();
   }, []);
+
+  useEffect(() => {
+    const shimmerLoop = Animated.loop(
+      Animated.timing(shimmerAnim, {
+        toValue: 1,
+        duration: 3200,
+        useNativeDriver: true,
+      })
+    );
+    shimmerLoop.start();
+    return () => {
+      shimmerLoop.stop();
+    };
+  }, [shimmerAnim]);
 
   const loadSettings = async () => {
     const savedSettings = await getSettings();
@@ -58,9 +75,30 @@ export default function SettingsScreen() {
   return (
     <View style={styles.container}>
       <ImageBackground source={BACKGROUND_IMAGE} style={styles.backgroundImage} resizeMode="cover">
+        <TwinklingStars count={28} />
         <View style={styles.contentWrapper}>
           {/* Main Settings Panel with Golden Marquee Border */}
           <View style={styles.settingsPanel}>
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                styles.panelShimmer,
+                {
+                  transform: [
+                    {
+                      translateX: shimmerAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [-width, width],
+                      }),
+                    },
+                  ],
+                  opacity: shimmerAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0, 0.15],
+                  }),
+                },
+              ]}
+            />
             {/* Marquee Lights Border Effect */}
             <View style={styles.marqueeLightsContainer}>
               {/* Top lights */}
@@ -186,6 +224,12 @@ const styles = StyleSheet.create({
     elevation: 20,
     position: 'relative',
     overflow: 'visible',
+  },
+  panelShimmer: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    opacity: 0.05,
   },
   marqueeLightsContainer: {
     position: 'absolute',

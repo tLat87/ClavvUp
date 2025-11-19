@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   Dimensions,
   ImageBackground,
   Image,
+  Animated,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -15,6 +16,7 @@ import { stories } from '../clavvupData/stories';
 import { Story } from '../clavvupTypes';
 import { Share } from 'react-native';
 import { BACKGROUND_IMAGE } from '../clavvupConstants/Images';
+import TwinklingStars from '../clavvupComponents/TwinklingStars';
 
 const { width, height } = Dimensions.get('window');
 
@@ -27,6 +29,18 @@ type NavigationProp = NativeStackNavigationProp<StoriesStackParamList>;
 
 export default function StoriesScreen() {
   const navigation = useNavigation<NavigationProp>();
+  const cardAnimations = useRef(stories.map(() => new Animated.Value(0))).current;
+
+  useEffect(() => {
+    const animations = cardAnimations.map(anim =>
+      Animated.timing(anim, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      })
+    );
+    Animated.stagger(120, animations).start();
+  }, [cardAnimations]);
 
   const handleStoryPress = (story: Story) => {
     navigation.navigate('StoryDetail', { storyId: story.id });
@@ -46,10 +60,33 @@ export default function StoriesScreen() {
   return (
     <View style={styles.container}>
       <ImageBackground source={BACKGROUND_IMAGE} style={styles.backgroundImage} resizeMode="cover">
+        <TwinklingStars count={30} />
         <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
-          {stories.map((story) => (
-            <TouchableOpacity
+          {stories.map((story, index) => (
+            <Animated.View
               key={story.id}
+              style={[
+                styles.storyCardWrapper,
+                {
+                  opacity: cardAnimations[index],
+                  transform: [
+                    {
+                      translateY: cardAnimations[index].interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [40, 0],
+                      }),
+                    },
+                    {
+                      scale: cardAnimations[index].interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0.95, 1],
+                      }),
+                    },
+                  ],
+                },
+              ]}
+            >
+            <TouchableOpacity
               style={styles.storyCard}
               onPress={() => handleStoryPress(story)}
             >
@@ -93,6 +130,7 @@ export default function StoriesScreen() {
                 </View>
               </View>
             </TouchableOpacity>
+            </Animated.View>
           ))}
         </ScrollView>
       </ImageBackground>
@@ -120,7 +158,6 @@ const styles = StyleSheet.create({
   storyCard: {
     backgroundColor: '#DC143C',
     borderRadius: 16,
-    marginBottom: 20,
     borderWidth: 4,
     borderColor: '#FFD700',
     overflow: 'hidden',
@@ -132,6 +169,9 @@ const styles = StyleSheet.create({
     elevation: 15,
     // Marquee lights effect
     position: 'relative',
+  },
+  storyCardWrapper: {
+    marginBottom: 20,
   },
   thumbnailContainer: {
     width: 120,

@@ -18,7 +18,7 @@ function App() {
 
   const handleLoaderComplete = () => {
     setShowLoader(false);
-    setShowOnboarding(true); // Онбординг завжди показується після лоадера
+    setShowOnboarding(true); 
   };
 
   const handleOnboardingComplete = () => {
