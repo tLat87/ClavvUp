@@ -5,32 +5,39 @@
  * @format
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { StatusBar } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import LoaderScreen from './clavvup/clavvupScreens/LoaderScreen';
 import OnboardingScreen from './clavvup/clavvupScreens/OnboardingScreen';
 import AppNavigator from './clavvup/clavvupNavigation/AppNavigator';
+import { isOnboardingComplete } from './clavvup/clavvupUtils/storage';
 
 function App() {
-  const [showLoader, setShowLoader] = useState(true);
+  const [isInitializing, setIsInitializing] = useState(true);
   const [showOnboarding, setShowOnboarding] = useState(false);
 
-  const handleLoaderComplete = () => {
-    setShowLoader(false);
-    setShowOnboarding(true); 
-  };
+  useEffect(() => {
+    const prepareAppState = async () => {
+      const onboardingDone = await isOnboardingComplete();
+      setShowOnboarding(!onboardingDone);
+      setIsInitializing(false);
+    };
+
+    prepareAppState();
+  }, []);
 
   const handleOnboardingComplete = () => {
     setShowOnboarding(false);
   };
 
+  if (isInitializing) {
+    return null;
+  }
+
   return (
     <SafeAreaProvider>
       <StatusBar barStyle="light-content" />
-      {showLoader ? (
-        <LoaderScreen onComplete={handleLoaderComplete} />
-      ) : showOnboarding ? (
+      {showOnboarding ? (
         <OnboardingScreen onComplete={handleOnboardingComplete} />
       ) : (
         <AppNavigator />

@@ -6,6 +6,7 @@ const STORAGE_KEYS = {
   DAILY_PROGRESS: '@clavvup:daily_progress',
   SETTINGS: '@clavvup:settings',
   LAST_CLAW_DATE: '@clavvup:last_claw_date',
+  TODAY_MOOD: '@clavvup:today_mood',
 };
 
 export async function isOnboardingComplete(): Promise<boolean> {
@@ -64,5 +65,31 @@ export async function wasClawUsedToday(): Promise<boolean> {
 export async function setClawUsedToday(): Promise<void> {
   const today = new Date().toDateString();
   await AsyncStorage.setItem(STORAGE_KEYS.LAST_CLAW_DATE, today);
+}
+
+export async function getTodayMood(): Promise<string | null> {
+  const data = await AsyncStorage.getItem(STORAGE_KEYS.TODAY_MOOD);
+  if (!data) {
+    return null;
+  }
+
+  try {
+    const record = JSON.parse(data);
+    const today = new Date().toDateString();
+    if (record.date === today) {
+      return record.mood;
+    }
+  } catch (error) {
+    // ignore parse issues and reset mood
+  }
+  return null;
+}
+
+export async function saveTodayMood(mood: string): Promise<void> {
+  const today = new Date().toDateString();
+  await AsyncStorage.setItem(
+    STORAGE_KEYS.TODAY_MOOD,
+    JSON.stringify({ date: today, mood }),
+  );
 }
 

@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { BACKGROUND_IMAGE } from '../clavvupConstants/Images';
 import TwinklingStars from '../clavvupComponents/TwinklingStars';
+import { setOnboardingComplete } from '../clavvupUtils/storage';
 
 const { width, height } = Dimensions.get('window');
 
@@ -47,10 +48,11 @@ export default function OnboardingScreen({ onComplete }: OnboardingScreenProps) 
   const heroFloat = useRef(new Animated.Value(0)).current;
   const buttonPulse = useRef(new Animated.Value(0)).current;
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (currentIndex < onboardingData.length - 1) {
       setCurrentIndex(currentIndex + 1);
     } else {
+      await setOnboardingComplete();
       onComplete();
     }
   };

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -10,10 +10,12 @@ import {
   ImageBackground,
   Image,
 } from 'react-native';
-import { generateRandomTasks } from '../clavvupData/tasks';
-import { getDailyProgress, saveDailyProgress } from '../clavvupUtils/storage';
-import { Task, DailyProgress } from '../clavvupTypes';
 import { Share } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { generateRandomTasks } from '../clavvupData/tasks';
+import { stories } from '../clavvupData/stories';
+import { getDailyProgress, saveDailyProgress, getTodayMood, saveTodayMood } from '../clavvupUtils/storage';
+import { Task, DailyProgress, Story } from '../clavvupTypes';
 import { BACKGROUND_IMAGE, CHARACTER_IMAGE } from '../clavvupConstants/Images';
 import TwinklingStars from '../clavvupComponents/TwinklingStars';
 
@@ -23,6 +25,20 @@ const { width, height } = Dimensions.get('window');
 
 // Конкретні кольори для завдань як на фото
 const TASK_COLORS = ['#FF69B4', '#4169E1', '#FFD700']; // Pink, Blue, Yellow
+const MOOD_OPTIONS = [
+  { id: 'energized', label: 'Energized', emoji: '⚡️' },
+  { id: 'calm', label: 'Calm', emoji: '🌙' },
+  { id: 'reflective', label: 'Reflective', emoji: '🪞' },
+  { id: 'playful', label: 'Playful', emoji: '🎈' },
+];
+const FOCUS_THEMES = [
+  'Protect your morning energy.',
+  'Choose one micro win and elevate it.',
+  'Move slowly but with intention.',
+  'Pause before reacting today.',
+  'Gift yourself an extra breath.',
+];
+const WEEK_TEMPLATE = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 export default function TodaysQuestScreen() {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -33,9 +49,19 @@ export default function TodaysQuestScreen() {
   const quotePulse = useRef(new Animated.Value(0)).current;
   const progressAnim = useRef(new Animated.Value(0)).current;
   const taskScales = useRef<Record<string, Animated.Value>>({}).current;
+  const [selectedMood, setSelectedMood] = useState<string | null>(null);
+  const [dailyFocus, setDailyFocus] = useState<string>('');
+  const [highlightStory, setHighlightStory] = useState<Story | null>(null);
+  const navigation = useNavigation<any>();
 
   useEffect(() => {
     loadDailyProgress();
+    loadMood();
+  }, []);
+
+  useEffect(() => {
+    setDailyFocus(FOCUS_THEMES[Math.floor(Math.random() * FOCUS_THEMES.length)]);
+    setHighlightStory(stories[Math.floor(Math.random() * stories.length)]);
   }, []);
 
   useEffect(() => {
@@ -163,6 +189,13 @@ export default function TodaysQuestScreen() {
     }
   };
 
+  const loadMood = async () => {
+    const mood = await getTodayMood();
+    if (mood) {
+      setSelectedMood(mood);
+    }
+  };
+
   const handleShareQuote = async () => {
     try {
       await Share.share({
@@ -174,33 +207,141 @@ export default function TodaysQuestScreen() {
     }
   };
 
+  const handleMoodSelect = async (moodId: string) => {
+    setSelectedMood(moodId);
+    await saveTodayMood(moodId);
+  };
+
+  const handleStoryHighlightPress = () => {
+    if (!highlightStory) {
+      return;
+    }
+    navigation.navigate('Stories', {
+      screen: 'StoryDetail',
+      params: { storyId: highlightStory.id },
+    });
+  };
+
+  const weeklySnapshot = useMemo(
+    () =>
+      WEEK_TEMPLATE.map((label, index) => {
+        const jsDay = new Date().getDay();
+        const mappedDay = index === 6 ? 0 : index + 1; // align Mon-Sun with JS Sunday=0
+        const isToday = jsDay === mappedDay;
+        const intensity =
+          completedCount === 0
+            ? 0
+            : Math.min(1, (completedCount + index) / 4);
+        return { label, isToday, intensity };
+      }),
+    [completedCount]
+  );
+
   return (
     <View style={styles.container}>
       <ImageBackground source={BACKGROUND_IMAGE} style={styles.backgroundImage} resizeMode="cover">
         <TwinklingStars count={28} />
         <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
-          {/* Character Image */}
-          <View style={styles.characterContainer}>
-            <Animated.Image
-              source={CHARACTER_IMAGE}
-              style={[
-                styles.characterImage,
-                {
-                  transform: [
-                    {
-                      translateY: characterFloat.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [-8, 8],
-                      }),
-                    },
-                  ],
-                },
-              ]}
-              resizeMode="contain"
-            />
+          {/* Focus Header */}
+          <View style={styles.focusRow}>
+            <View style={styles.focusCard}>
+              <Text style={styles.focusLabel}>Today’s focus</Text>
+              <Text style={styles.focusTitle}>{dailyFocus}</Text>
+              <TouchableOpacity
+                style={styles.focusButton}
+                onPress={() =>
+                  setDailyFocus(FOCUS_THEMES[Math.floor(Math.random() * FOCUS_THEMES.length)])
+                }
+                activeOpacity={0.8}
+              >
+                <Text style={styles.focusButtonText}>Shuffle</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.characterContainer}>
+              <Animated.Image
+                source={CHARACTER_IMAGE}
+                style={[
+                  styles.characterImage,
+                  {
+                    transform: [
+                      {
+                        translateY: characterFloat.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [-8, 8],
+                        }),
+                      },
+                    ],
+                  },
+                ]}
+                resizeMode="contain"
+              />
+            </View>
           </View>
 
-          {/* Motivational Banner - Always Visible */}
+          {/* Weekly Rhythm */}
+          <View style={styles.weekWrapper}>
+            <Text style={styles.sectionHeading}>Weekly rhythm</Text>
+            <View style={styles.weekRow}>
+              {weeklySnapshot.map(day => (
+                <View key={day.label} style={[styles.weekDay, day.isToday && styles.weekDayActive]}>
+                  <View
+                    style={[
+                      styles.weekPulse,
+                      { opacity: 0.35 + day.intensity * 0.6 },
+                      day.isToday && styles.weekPulseActive,
+                    ]}
+                  />
+                  <Text style={[styles.weekLabel, day.isToday && styles.weekLabelActive]}>
+                    {day.label}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          </View>
+
+          {/* Mood Selector */}
+          <View style={styles.moodCard}>
+            <View style={styles.moodHeader}>
+              <Text style={styles.sectionHeading}>Mood check-in</Text>
+              {selectedMood && <Text style={styles.moodHint}>saved for today</Text>}
+            </View>
+            <View style={styles.moodRow}>
+              {MOOD_OPTIONS.map(option => {
+                const isActive = selectedMood === option.id;
+                return (
+                  <TouchableOpacity
+                    key={option.id}
+                    onPress={() => handleMoodSelect(option.id)}
+                    style={[styles.moodPill, isActive && styles.moodPillActive]}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={styles.moodEmoji}>{option.emoji}</Text>
+                    <Text style={[styles.moodLabel, isActive && styles.moodLabelActive]}>
+                      {option.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+
+          {/* Micro wins */}
+          <View style={styles.statsCard}>
+            <View>
+              <Text style={styles.sectionHeading}>Micro wins</Text>
+              <Text style={styles.statsValue}>{completedCount}/3</Text>
+              <Text style={styles.statsHint}>quests checked off</Text>
+            </View>
+            <View style={styles.statsDivider} />
+            <View>
+              <Text style={styles.sectionHeading}>Share mantra</Text>
+              <TouchableOpacity onPress={handleShareQuote} style={styles.shareButton}>
+                <Text style={styles.shareButtonText}>Send</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Motivational Banner */}
           <Animated.View
             style={[
               styles.quoteBanner,
@@ -221,12 +362,34 @@ export default function TodaysQuestScreen() {
             ]}
           >
             <Text style={styles.quoteText}>Small steps, real change.</Text>
-            <TouchableOpacity onPress={handleShareQuote} style={styles.shareButton}>
-            </TouchableOpacity>
+            <Text style={styles.quoteSubText}>Remind someone why gentle consistency works.</Text>
           </Animated.View>
 
+          {/* Highlight Story */}
+          {highlightStory && (
+            <TouchableOpacity
+              style={styles.storyHighlight}
+              onPress={handleStoryHighlightPress}
+              activeOpacity={0.85}
+            >
+              <ImageBackground
+                source={highlightStory.image}
+                style={styles.storyHighlightImage}
+                imageStyle={styles.storyHighlightImageStyle}
+              >
+                <View style={styles.storyOverlay} />
+                <Text style={styles.storyHighlightLabel}>Spark of the day</Text>
+                <Text style={styles.storyHighlightTitle}>{highlightStory.title}</Text>
+                <Text numberOfLines={2} style={styles.storyHighlightQuote}>
+                  “{highlightStory.quote}”
+                </Text>
+                <Text style={styles.storyHighlightCta}>Read story →</Text>
+              </ImageBackground>
+            </TouchableOpacity>
+          )}
+
           {/* Daily Tasks */}
-          <Text style={styles.sectionTitle}>Daily Tasks:</Text>
+          <Text style={styles.sectionTitle}>Daily quests</Text>
           {tasks.map((task, index) => {
             const taskColor = TASK_COLORS[index] || '#FF69B4';
             if (!taskScales[task.id]) {
@@ -251,7 +414,7 @@ export default function TodaysQuestScreen() {
           })}
 
           {/* Daily Progress */}
-          <Text style={styles.sectionTitle}>Daily Progress:</Text>
+          <Text style={styles.sectionTitle}>Daily Progress</Text>
           <View style={styles.progressCard}>
             <Animated.View
               style={[
@@ -312,15 +475,97 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingTop: 40,
   },
-  characterContainer: {
+  focusRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 20,
-    height: 180,
+    marginBottom: 24,
+    gap: 16,
+  },
+  focusCard: {
+    flex: 1,
+    backgroundColor: '#DC143C',
+    borderRadius: 18,
+    padding: 18,
+    borderWidth: 3,
+    borderColor: '#FFD700',
+  },
+  focusLabel: {
+    color: '#FFD700',
+    fontSize: 12,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+  },
+  focusTitle: {
+    fontSize: 20,
+    color: '#fff',
+    fontWeight: '700',
+    marginTop: 8,
+    marginBottom: 12,
+  },
+  focusButton: {
+    alignSelf: 'flex-start',
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+    backgroundColor: '#FFD700',
+  },
+  focusButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#4B0082',
+    textTransform: 'uppercase',
+  },
+  characterContainer: {
+    width: 110,
+    height: 140,
+    alignItems: 'center',
     justifyContent: 'center',
   },
   characterImage: {
-    width: 150,
-    height: 180,
+    width: 110,
+    height: 140,
+  },
+  weekWrapper: {
+    padding: 16,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    marginBottom: 20,
+  },
+  sectionHeading: {
+    color: '#FFD700',
+    fontSize: 14,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  weekRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 12,
+  },
+  weekDay: {
+    alignItems: 'center',
+    gap: 6,
+  },
+  weekDayActive: {},
+  weekPulse: {
+    width: 30,
+    height: 8,
+    borderRadius: 6,
+    backgroundColor: '#4169E1',
+  },
+  weekPulseActive: {
+    backgroundColor: '#FFD700',
+  },
+  weekLabel: {
+    color: '#FFFFFFaa',
+    fontSize: 12,
+  },
+  weekLabelActive: {
+    color: '#FFD700',
+    fontWeight: '700',
   },
   quoteBanner: {
     backgroundColor: '#DC143C',
@@ -346,9 +591,25 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     flex: 1,
   },
+  quoteSubText: {
+    color: '#fff',
+    fontSize: 12,
+    marginTop: 6,
+    opacity: 0.8,
+  },
   shareButton: {
-    marginLeft: 12,
-    padding: 8,
+    marginTop: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    borderRadius: 18,
+    backgroundColor: '#FFD700',
+  },
+  shareButtonText: {
+    color: '#4B0082',
+    fontSize: 12,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
   },
   sectionTitle: {
     fontSize: 18,
@@ -356,6 +617,30 @@ const styles = StyleSheet.create({
     color: '#fff',
     marginTop: 16,
     marginBottom: 12,
+  },
+  statsCard: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    padding: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+  },
+  statsValue: {
+    color: '#FFD700',
+    fontSize: 32,
+    fontWeight: '800',
+  },
+  statsHint: {
+    color: '#FFFFFFcc',
+    fontSize: 12,
+  },
+  statsDivider: {
+    width: 1,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    marginHorizontal: 18,
   },
   taskCard: {
     borderRadius: 12,
@@ -409,6 +694,97 @@ const styles = StyleSheet.create({
     fontSize: 24,
     color: '#fff',
     fontWeight: 'bold',
+  },
+  moodCard: {
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius: 18,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    marginBottom: 20,
+  },
+  moodHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  moodHint: {
+    color: '#FFFFFF99',
+    fontSize: 12,
+  },
+  moodRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  moodPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
+    borderColor: 'transparent',
+    flex: 1,
+    minWidth: '45%',
+  },
+  moodPillActive: {
+    borderColor: '#FFD700',
+    backgroundColor: 'rgba(255,215,0,0.12)',
+  },
+  moodEmoji: {
+    fontSize: 16,
+    marginRight: 8,
+  },
+  moodLabel: {
+    color: '#FFFFFFcc',
+    fontWeight: '500',
+  },
+  moodLabelActive: {
+    color: '#FFD700',
+  },
+  storyHighlight: {
+    marginBottom: 24,
+    borderRadius: 20,
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: '#FFD700',
+  },
+  storyHighlightImage: {
+    height: 180,
+    justifyContent: 'flex-end',
+    padding: 16,
+  },
+  storyHighlightImageStyle: {
+    borderRadius: 18,
+  },
+  storyOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(5,5,35,0.6)',
+  },
+  storyHighlightLabel: {
+    color: '#FFD700',
+    fontSize: 12,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+  },
+  storyHighlightTitle: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '700',
+    marginTop: 6,
+  },
+  storyHighlightQuote: {
+    color: '#FFFFFFcc',
+    marginTop: 4,
+  },
+  storyHighlightCta: {
+    color: '#FFD700',
+    fontWeight: '600',
+    marginTop: 10,
   },
   fireworks: {
     position: 'absolute',

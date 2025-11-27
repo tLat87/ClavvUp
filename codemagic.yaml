@@ -4,14 +4,14 @@ workflows:
         max_build_duration: 120
         instance_type: mac_mini_m1
         integrations:
-          app_store_connect: ClavvUpAPIKeyNew
+          app_store_connect: ClavvMyAppUpAPIKeyNew
         environment:
           ios_signing:
             distribution_type: app_store
-            bundle_identifier: com.ClavvUp.2025
+            bundle_identifier: com.ClavvMyAppUp.2025
           vars:
-            APP_STORE_APPLE_ID: 6755358271
-            BUNDLE_ID: "com.ClavvUp.2025"
+            APP_STORE_APPLE_ID: 6755816771
+            BUNDLE_ID: "com.ClavvMyAppUp.2025"
             XCODE_WORKSPACE: "ClavvUp.xcworkspace"
             XCODE_SCHEME: "ClavvUp"
         scripts:
